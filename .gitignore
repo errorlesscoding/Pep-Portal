@@ -1,0 +1,34 @@
+# Node & Project Dependency Exclusions
+node_modules/
+**/node_modules/
+package-lock.json
+
+# Environment Secrets
+.env
+**/server/.env
+**/.env.local
+**/.env.production
+
+# Build Outputs
+dist/
+build/
+out/
+.bin/
+project.zip
+
+# Upload Files & Logs
+server/uploads/*
+!server/uploads/.gitkeep
+*.log
+**/logs/
+
+# System & OS Exclusions
+.DS_Store
+Thumbs.db
+
+# IDE Configuration Lists
+.vscode/
+.idea/
+.agents/
+.gemini/
+antigravity-ide/
