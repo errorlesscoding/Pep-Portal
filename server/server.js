@@ -16,16 +16,32 @@ const allowedOrigins = [
   .map((origin) => origin && origin.trim().replace(/\/+$/, ''))
   .filter(Boolean);
 
-const corsOptions = allowedOrigins.length
-  ? {
-      origin(origin, callback) {
-        if (!origin || allowedOrigins.includes(origin.replace(/\/+$/, ''))) {
-          return callback(null, true);
-        }
-        return callback(new Error('Not allowed by CORS'));
-      },
+const corsOptions = {
+  origin(origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, server-to-server)
+    if (!origin) return callback(null, true);
+
+    const normalizedOrigin = origin.replace(/\/+$/, '');
+
+    // Allow if origin is in the explicit allowedOrigins list
+    if (allowedOrigins.includes(normalizedOrigin)) {
+      return callback(null, true);
     }
-  : {};
+
+    // Allow all Vercel preview deployment URLs (*.vercel.app)
+    if (/\.vercel\.app$/i.test(normalizedOrigin)) {
+      return callback(null, true);
+    }
+
+    // Allow localhost for development
+    if (/^https?:\/\/localhost(:\d+)?$/i.test(normalizedOrigin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+};
 
 // Middleware
 app.use(cors(corsOptions));
