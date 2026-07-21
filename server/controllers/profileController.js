@@ -3,7 +3,7 @@ const Profile = require('../models/Profile');
 // @desc    Get user profile
 // @route   GET /api/profile
 // @access  Private
-const getUserProfile = async (req, res) => {
+const getUserProfile = async (req, res, next) => {
   try {
     let profile = await Profile.findOne({ user: req.user._id });
     
@@ -21,15 +21,14 @@ const getUserProfile = async (req, res) => {
       data: profile,
     });
   } catch (error) {
-    console.error('Error fetching profile:', error);
-    res.status(500).json({ success: false, message: 'Server error retrieving profile' });
+    next(error);
   }
 };
 
 // @desc    Update user profile
 // @route   PUT /api/profile
 // @access  Private
-const updateUserProfile = async (req, res) => {
+const updateUserProfile = async (req, res, next) => {
   try {
     const { phone, college, university, skills, experience, projects, linkedin, github, portfolio } = req.body;
 
@@ -66,8 +65,7 @@ const updateUserProfile = async (req, res) => {
       data: profile,
     });
   } catch (error) {
-    console.error('Error updating profile:', error);
-    res.status(500).json({ success: false, message: 'Server error updating profile' });
+    next(error);
   }
 };
 

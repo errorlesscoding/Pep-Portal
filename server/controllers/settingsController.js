@@ -3,7 +3,7 @@ const Settings = require('../models/Settings');
 // @desc    Get user settings
 // @route   GET /api/settings
 // @access  Private
-const getUserSettings = async (req, res) => {
+const getUserSettings = async (req, res, next) => {
   try {
     let settings = await Settings.findOne({ user: req.user._id });
     
@@ -21,15 +21,14 @@ const getUserSettings = async (req, res) => {
       data: settings,
     });
   } catch (error) {
-    console.error('Error fetching settings:', error);
-    res.status(500).json({ success: false, message: 'Server error retrieving settings' });
+    next(error);
   }
 };
 
 // @desc    Update user settings
 // @route   PUT /api/settings
 // @access  Private
-const updateUserSettings = async (req, res) => {
+const updateUserSettings = async (req, res, next) => {
   try {
     const { theme, speechEnabled, difficultyPref } = req.body;
 
@@ -50,8 +49,7 @@ const updateUserSettings = async (req, res) => {
       data: settings,
     });
   } catch (error) {
-    console.error('Error updating settings:', error);
-    res.status(500).json({ success: false, message: 'Server error updating settings' });
+    next(error);
   }
 };
 

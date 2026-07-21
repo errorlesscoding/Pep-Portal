@@ -24,7 +24,6 @@
     "string-similarity": "^4.0.4"
   },
   "devDependencies": {
-    "mongodb-memory-server": "^9.5.0",
     "nodemon": "^3.1.0"
   }
 }

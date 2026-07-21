@@ -8,7 +8,7 @@ const { generateFirstQuestion, generateNextQuestion, evaluateSingleResponse, gen
 // @desc    Start Interview Session, Generate Question 1 & Create Records
 // @route   POST /api/interview/start
 // @access  Private
-const startInterview = async (req, res) => {
+const startInterview = async (req, res, next) => {
   try {
     const { 
       candidateName,
@@ -91,15 +91,14 @@ const startInterview = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error starting interview session:', error);
-    res.status(500).json({ success: false, message: 'Server error generating interview questions' });
+    next(error);
   }
 };
 
 // @desc    Grade Single Response Immediately, then Generate next question if not complete
 // @route   POST /api/interview/grade-answer
 // @access  Private
-const gradeAnswer = async (req, res) => {
+const gradeAnswer = async (req, res, next) => {
   try {
     const { interviewId, questionId, answerText } = req.body;
 
@@ -281,15 +280,14 @@ const gradeAnswer = async (req, res) => {
       isLastQuestion
     });
   } catch (error) {
-    console.error('Error grading response:', error);
-    res.status(500).json({ success: false, message: 'Server error evaluating answer' });
+    next(error);
   }
 };
 
 // @desc    Finish Session, Calculate Aggregate Report & AI Recommendations
 // @route   POST /api/interview/finish
 // @access  Private
-const finishInterview = async (req, res) => {
+const finishInterview = async (req, res, next) => {
   try {
     const { interviewId, duration } = req.body;
 
@@ -366,195 +364,16 @@ const finishInterview = async (req, res) => {
       data: populatedSession,
     });
   } catch (error) {
-    console.error('Error completing interview session:', error);
-    res.status(500).json({ success: false, message: 'Server error compiling final report' });
+    next(error);
   }
 };
 
-// @desc    Submit Legacy Payload (maps directly to grading / complete checks)
-// @route   POST /api/interview/submit
-// @access  Private
-const submitInterview = async (req, res) => {
-  try {
-    const { interviewId, answers, duration } = req.body;
 
-    if (!interviewId || !Array.isArray(answers) || answers.length === 0) {
-      return res.status(400).json({ success: false, message: 'Please submit an interview ID and answers' });
-    }
-
-    const session = await Interview.findById(interviewId);
-    if (!session) {
-      return res.status(404).json({ success: false, message: 'Interview session not found' });
-    }
-
-    if (session.user.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ success: false, message: 'User not authorized to modify this interview' });
-    }
-
-    for (const ans of answers) {
-      if (!ans.questionId) {
-        return res.status(400).json({ success: false, message: 'Each answer must include a question ID' });
-      }
-
-      const questionRecord = await InterviewQuestion.findById(ans.questionId);
-      if (!questionRecord || questionRecord.session.toString() !== session._id.toString()) {
-        return res.status(400).json({ success: false, message: 'Invalid question submitted for this interview' });
-      }
-
-      const cleanAns = (ans.answerText || '').trim();
-      const isSkipped = cleanAns === 'Skipped' || cleanAns === '';
-      const answerRecord = await InterviewAnswer.create({
-        session: session._id,
-        question: ans.questionId,
-        answerText: isSkipped ? 'Skipped' : cleanAns,
-      });
-
-      let evaluation;
-
-      const wordsList = cleanAns.split(/\s+/).filter(w => w.length > 0);
-      const wordsCount = wordsList.length;
-      const oneWordRegex = /^(yes|no|ok|okay|idk|maybe|don't know|no idea)$/i;
-
-      if (isSkipped) {
-        evaluation = {
-          score: 0,
-          accuracyScore: 0,
-          confidenceScore: 0,
-          technicalDepthScore: 0,
-          communicationScore: 0,
-          grammarScore: 0,
-          fluencyScore: 0,
-          relevanceScore: 0,
-          completenessScore: 0,
-          feedback: 'Question was skipped.',
-          sampleAnswer: 'No sample answer compiled.',
-          strengths: [],
-          weaknesses: ['Skipped'],
-          missingConcepts: [],
-          suggestedImprovements: [],
-          betterExplanation: '',
-          interviewTip: ''
-        };
-      } else if (wordsCount < 15 || oneWordRegex.test(cleanAns)) {
-        const dynamicTech = Math.floor(Math.random() * 11);
-        const dynamicComm = Math.floor(Math.random() * 21);
-        const dynamicOverall = Math.floor(Math.random() * 6) + 9;
-
-        evaluation = {
-          score: dynamicOverall,
-          accuracyScore: 10,
-          confidenceScore: 10,
-          technicalDepthScore: dynamicTech,
-          communicationScore: dynamicComm,
-          grammarScore: 20,
-          fluencyScore: 10,
-          relevanceScore: 20,
-          completenessScore: 10,
-          feedback: 'Answer is too short.',
-          sampleAnswer: 'Sample answer explanation.',
-          strengths: [],
-          weaknesses: ['Too short'],
-          missingConcepts: [],
-          suggestedImprovements: [],
-          betterExplanation: '',
-          interviewTip: ''
-        };
-      } else {
-        evaluation = await evaluateSingleResponse(
-          questionRecord ? questionRecord.questionText : 'Question',
-          answerRecord.answerText,
-          session.type,
-          session.targetRole
-        );
-      }
-
-      const resultRecord = await InterviewResult.create({
-        session: session._id,
-        question: ans.questionId,
-        answer: answerRecord._id,
-        score: evaluation.score,
-        feedback: evaluation.feedback,
-        sampleAnswer: evaluation.sampleAnswer,
-        accuracyScore: evaluation.accuracyScore,
-        confidenceScore: evaluation.confidenceScore,
-        technicalDepthScore: evaluation.technicalDepthScore,
-        communicationScore: evaluation.communicationScore,
-        grammarScore: evaluation.grammarScore,
-        fluencyScore: evaluation.fluencyScore,
-        relevanceScore: evaluation.relevanceScore,
-        completenessScore: evaluation.completenessScore,
-        strengths: evaluation.strengths,
-        weaknesses: evaluation.weaknesses,
-        missingConcepts: evaluation.missingConcepts,
-        suggestedImprovements: evaluation.suggestedImprovements,
-        betterExplanation: evaluation.betterExplanation || '',
-        interviewTip: evaluation.interviewTip || ''
-      });
-
-      session.answers.push(answerRecord._id);
-      session.results.push(resultRecord._id);
-    }
-
-    session.duration = duration || 0;
-    session.status = 'completed';
-
-    // Gather all graded results
-    const resultsList = await InterviewResult.find({ session: session._id })
-      .populate('question')
-      .populate('answer');
-
-    const formattedResults = resultsList.map(r => ({
-      questionText: r.question?.questionText || '',
-      answerText: r.answer?.answerText || '',
-      score: r.score,
-      feedback: r.feedback
-    }));
-
-    // Query Gemini to compile report
-    const report = await generateFinalReport(session, formattedResults);
-
-    // Save report details
-    session.overallScore = report.overallScore;
-    session.technicalScore = report.technicalScore;
-    session.communicationScore = report.communicationScore;
-    session.confidenceScore = report.confidenceScore;
-    session.problemSolvingScore = report.problemSolvingScore;
-    session.behaviorScore = report.behaviorScore;
-    session.grammarScore = report.grammarScore;
-    session.hiringRecommendation = report.hiringRecommendation;
-    session.overallFeedback = report.overallFeedback;
-    session.strongAreas = report.strongAreas;
-    session.weakAreas = report.weakAreas;
-    session.recommendationTopics = report.recommendationTopics;
-    session.recommendationDSA = report.recommendationDSA;
-    session.recommendationProjects = report.recommendationProjects;
-    session.recommendationTips = report.recommendationTips;
-    session.recommendationResources = report.recommendationResources;
-
-    await session.save();
-
-    const populatedSession = await Interview.findById(session._id)
-      .populate('questions')
-      .populate('answers')
-      .populate({
-        path: 'results',
-        populate: ['question', 'answer'],
-      });
-
-    res.status(200).json({
-      success: true,
-      data: populatedSession
-    });
-  } catch (error) {
-    console.error('Error submitting mock interview:', error);
-    res.status(500).json({ success: false, message: 'Server error processing evaluations' });
-  }
-};
 
 // @desc    Get user's mock interview history
 // @route   GET /api/interview/history
 // @access  Private
-const getInterviewHistory = async (req, res) => {
+const getInterviewHistory = async (req, res, next) => {
   try {
     const interviews = await Interview.find({ user: req.user._id, status: 'completed' })
       .populate('questions')
@@ -571,15 +390,14 @@ const getInterviewHistory = async (req, res) => {
       data: interviews,
     });
   } catch (error) {
-    console.error('Error fetching interview logs:', error);
-    res.status(500).json({ success: false, message: 'Server error retrieving logs' });
+    next(error);
   }
 };
 
 // @desc    Get single mock interview details
 // @route   GET /api/interview/:id
 // @access  Private
-const getInterviewById = async (req, res) => {
+const getInterviewById = async (req, res, next) => {
   try {
     const interview = await Interview.findById(req.params.id)
       .populate('questions')
@@ -602,15 +420,14 @@ const getInterviewById = async (req, res) => {
       data: interview,
     });
   } catch (error) {
-    console.error('Error fetching interview details:', error);
-    res.status(500).json({ success: false, message: 'Server error loading report details' });
+    next(error);
   }
 };
 
 // @desc    Download professional diagnostic PDF report for mock interview
 // @route   GET /api/interview/:id/pdf
 // @access  Private
-const downloadInterviewPDF = async (req, res) => {
+const downloadInterviewPDF = async (req, res, next) => {
   try {
     const interview = await Interview.findById(req.params.id)
       .populate('questions')
@@ -776,8 +593,7 @@ const downloadInterviewPDF = async (req, res) => {
 
     doc.end();
   } catch (error) {
-    console.error('Error generating report PDF:', error);
-    res.status(500).json({ success: false, message: 'Server error generating PDF report' });
+    next(error);
   }
 };
 
@@ -785,7 +601,6 @@ module.exports = {
   startInterview,
   gradeAnswer,
   finishInterview,
-  submitInterview,
   getInterviewHistory,
   getInterviewById,
   downloadInterviewPDF,

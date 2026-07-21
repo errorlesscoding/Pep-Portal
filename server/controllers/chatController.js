@@ -4,7 +4,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // @desc    Get user's chat history
 // @route   GET /api/chat/history
 // @access  Private
-const getChatHistory = async (req, res) => {
+const getChatHistory = async (req, res, next) => {
   try {
     let chat = await ChatHistory.findOne({ user: req.user._id });
 
@@ -20,15 +20,14 @@ const getChatHistory = async (req, res) => {
       data: chat.messages,
     });
   } catch (error) {
-    console.error('Error getting chat history:', error);
-    res.status(500).json({ success: false, message: 'Server error loading conversation logs' });
+    next(error);
   }
 };
 
 // @desc    Send message to chatbot and get Gemini response (context-aware)
 // @route   POST /api/chat/message
 // @access  Private
-const sendMessage = async (req, res) => {
+const sendMessage = async (req, res, next) => {
   try {
     const { text, pageContext } = req.body;
 
@@ -82,13 +81,13 @@ const sendMessage = async (req, res) => {
           ${contextHistory}
           
           Assistant Response:
-        `;
+          `;
 
         const result = await model.generateContent(prompt);
         replyText = result.response.text().trim();
       } catch (error) {
         console.error("Gemini Chat Error:", error);
-        replyText = `ERROR: ${error.message}`;
+        replyText = `I'm sorry, I encountered a temporary connection issue. Please check your network or try asking your question again in a moment.`;
       }
     }
 
@@ -105,8 +104,7 @@ const sendMessage = async (req, res) => {
       data: chat.messages,
     });
   } catch (error) {
-    console.error('Error sending message:', error);
-    res.status(500).json({ success: false, message: 'Server error processing chatbot response' });
+    next(error);
   }
 };
 

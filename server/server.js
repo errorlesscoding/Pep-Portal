@@ -47,8 +47,34 @@ app.get('/', (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ success: false, message: 'Internal Server Error' });
+  console.error('Unhandled Server Error:', err);
+
+  // Mongoose validation error
+  if (err.name === 'ValidationError') {
+    const messages = Object.values(err.errors).map((val) => val.message);
+    return res.status(400).json({ success: false, message: messages.join(', ') });
+  }
+
+  // Mongoose cast error (invalid ObjectId format)
+  if (err.name === 'CastError') {
+    return res.status(400).json({ success: false, message: `Resource not found with invalid ID structure: ${err.value}` });
+  }
+
+  // Multer limit error (e.g. file too large)
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({ success: false, message: 'File size is too large. Maximum limit is 5MB.' });
+  }
+
+  // Multer file validation error
+  if (err.message && err.message.includes('Invalid file type')) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
+
+  // Fallback server error
+  res.status(err.status || 500).json({ 
+    success: false, 
+    message: err.message || 'Internal Server Error' 
+  });
 });
 
 const PORT = process.env.PORT || 5000;

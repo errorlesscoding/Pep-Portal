@@ -8,7 +8,7 @@ const { analyzeResumeHybrids } = require('../utils/atsAnalyzer');
 // @desc    Upload, Parse & Analyze Resume (Hybrid engine)
 // @route   POST /api/resume/upload
 // @access  Private
-const uploadResume = async (req, res) => {
+const uploadResume = async (req, res, next) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'Please upload a resume file' });
@@ -80,15 +80,14 @@ const uploadResume = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error uploading/analyzing resume:', error);
-    res.status(500).json({ success: false, message: 'Server error analyzing resume' });
+    next(error);
   }
 };
 
 // @desc    Get user's upload history
 // @route   GET /api/resume/history
 // @access  Private
-const getResumeHistory = async (req, res) => {
+const getResumeHistory = async (req, res, next) => {
   try {
     // Find resumes and populate their latest analysis data
     const resumes = await Resume.find({ user: req.user._id })
@@ -129,15 +128,14 @@ const getResumeHistory = async (req, res) => {
       }),
     });
   } catch (error) {
-    console.error('Error fetching resume history:', error);
-    res.status(500).json({ success: false, message: 'Server error retrieving upload logs' });
+    next(error);
   }
 };
 
 // @desc    Delete custom resume scan
 // @route   DELETE /api/resume/:id
 // @access  Private
-const deleteResume = async (req, res) => {
+const deleteResume = async (req, res, next) => {
   try {
     const resume = await Resume.findById(req.params.id);
 
@@ -171,8 +169,7 @@ const deleteResume = async (req, res) => {
       message: 'Resume and analysis records deleted successfully',
     });
   } catch (error) {
-    console.error('Error deleting resume:', error);
-    res.status(500).json({ success: false, message: 'Server error deleting audit log' });
+    next(error);
   }
 };
 

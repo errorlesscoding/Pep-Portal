@@ -4,7 +4,7 @@ const Interview = require('../models/Interview');
 // @desc    Get aggregated stats for dashboard & charts
 // @route   GET /api/analytics
 // @access  Private
-const getUserAnalytics = async (req, res) => {
+const getUserAnalytics = async (req, res, next) => {
   try {
     const userId = req.user._id;
 
@@ -106,8 +106,12 @@ const getUserAnalytics = async (req, res) => {
       });
     });
 
-    // Sort combined feed by date descending
-    activityFeed.sort((a, b) => b.date - a.date);
+    // Sort combined feed by date descending with safe timestamp check
+    activityFeed.sort((a, b) => {
+      const timeA = a.date ? new Date(a.date).getTime() : 0;
+      const timeB = b.date ? new Date(b.date).getTime() : 0;
+      return timeB - timeA;
+    });
 
     res.status(200).json({
       success: true,
@@ -132,8 +136,7 @@ const getUserAnalytics = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching analytics details:', error);
-    res.status(500).json({ success: false, message: 'Server error processing analytics pipeline' });
+    next(error);
   }
 };
 

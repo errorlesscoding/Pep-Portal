@@ -6,7 +6,7 @@ const normalizeEmail = (email) => email.trim().toLowerCase();
 // @desc    Register a new user
 // @route   POST /api/auth/register
 // @access  Public
-const registerUser = async (req, res) => {
+const registerUser = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
 
@@ -50,18 +50,14 @@ const registerUser = async (req, res) => {
       res.status(400).json({ success: false, message: 'Invalid user data' });
     }
   } catch (error) {
-    console.error(error);
-    if (error.message === 'JWT_SECRET must be configured in production') {
-      return res.status(500).json({ success: false, message: 'Authentication is not configured correctly' });
-    }
-    res.status(500).json({ success: false, message: 'Server error during registration' });
+    next(error);
   }
 };
 
 // @desc    Authenticate a user & get token
 // @route   POST /api/auth/login
 // @access  Public
-const loginUser = async (req, res) => {
+const loginUser = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
@@ -89,18 +85,14 @@ const loginUser = async (req, res) => {
       res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
   } catch (error) {
-    console.error(error);
-    if (error.message === 'JWT_SECRET must be configured in production') {
-      return res.status(500).json({ success: false, message: 'Authentication is not configured correctly' });
-    }
-    res.status(500).json({ success: false, message: 'Server error during login' });
+    next(error);
   }
 };
 
 // @desc    Get current user profile
 // @route   GET /api/auth/profile
 // @access  Private
-const getUserProfile = async (req, res) => {
+const getUserProfile = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id);
 
@@ -118,8 +110,7 @@ const getUserProfile = async (req, res) => {
       res.status(404).json({ success: false, message: 'User not found' });
     }
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: 'Server error fetching profile' });
+    next(error);
   }
 };
 
