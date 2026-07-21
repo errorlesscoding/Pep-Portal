@@ -5,11 +5,7 @@ import './index.css'
 import axios from 'axios';
 
 // Configure Axios default base URL for local development vs production API deployments
-const apiBaseUrl = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
-
-if (import.meta.env.PROD && !apiBaseUrl) {
-  console.error('VITE_API_URL is missing. Production API requests will not reach the backend.');
-}
+const apiBaseUrl = (import.meta.env.VITE_API_URL || 'https://ai-interview-prep-api-teok.onrender.com').trim().replace(/\/+$/, '');
 
 axios.defaults.baseURL = apiBaseUrl;
 
