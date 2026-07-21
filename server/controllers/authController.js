@@ -1,26 +1,28 @@
-const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { generateToken } = require('../utils/auth');
 
-// Helper to generate JWT Token
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || 'supersecretkey1234567890', {
-    expiresIn: '30d',
-  });
-};
+const normalizeEmail = (email) => email.trim().toLowerCase();
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
 // @access  Public
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ success: false, message: 'Please enter all fields' });
     }
 
+    const normalizedEmail = normalizeEmail(email);
+    const trimmedName = name.trim();
+
+    if (!trimmedName) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid name' });
+    }
+
     // Check if user exists
-    const userExists = await User.findOne({ email });
+    const userExists = await User.findOne({ email: normalizedEmail });
 
     if (userExists) {
       return res.status(400).json({ success: false, message: 'User already exists' });
@@ -28,10 +30,9 @@ const registerUser = async (req, res) => {
 
     // Create user
     const user = await User.create({
-      name,
-      email,
+      name: trimmedName,
+      email: normalizedEmail,
       password,
-      role: role || 'user', // Default is user
     });
 
     if (user) {
@@ -50,6 +51,9 @@ const registerUser = async (req, res) => {
     }
   } catch (error) {
     console.error(error);
+    if (error.message === 'JWT_SECRET must be configured in production') {
+      return res.status(500).json({ success: false, message: 'Authentication is not configured correctly' });
+    }
     res.status(500).json({ success: false, message: 'Server error during registration' });
   }
 };
@@ -65,8 +69,10 @@ const loginUser = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please enter email and password' });
     }
 
+    const normalizedEmail = normalizeEmail(email);
+
     // Find user by email and select password (as it is excluded by default in schema)
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ email: normalizedEmail }).select('+password');
 
     if (user && (await user.matchPassword(password))) {
       res.status(200).json({
@@ -84,6 +90,9 @@ const loginUser = async (req, res) => {
     }
   } catch (error) {
     console.error(error);
+    if (error.message === 'JWT_SECRET must be configured in production') {
+      return res.status(500).json({ success: false, message: 'Authentication is not configured correctly' });
+    }
     res.status(500).json({ success: false, message: 'Server error during login' });
   }
 };

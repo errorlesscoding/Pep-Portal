@@ -7,16 +7,28 @@ const { verifyGeminiConnection } = require('./utils/gemini');
 // Load environment variables
 dotenv.config();
 
-// Connect to Database
-connectDB();
-
-// Verify Gemini Connection
-verifyGeminiConnection();
-
 const app = express();
 
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : []),
+]
+  .map((origin) => origin && origin.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+
+const corsOptions = allowedOrigins.length
+  ? {
+      origin(origin, callback) {
+        if (!origin || allowedOrigins.includes(origin.replace(/\/+$/, ''))) {
+          return callback(null, true);
+        }
+        return callback(new Error('Not allowed by CORS'));
+      },
+    }
+  : {};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Routes
@@ -41,6 +53,16 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+const startServer = async () => {
+  await connectDB();
+  await verifyGeminiConnection();
+
+  app.listen(PORT, () => {
+    console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+  });
+};
+
+startServer().catch((error) => {
+  console.error('Failed to start server:', error);
+  process.exit(1);
 });

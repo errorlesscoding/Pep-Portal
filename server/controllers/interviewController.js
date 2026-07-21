@@ -112,9 +112,17 @@ const gradeAnswer = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Interview session not found' });
     }
 
+    if (session.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'User not authorized to modify this interview' });
+    }
+
     const questionRecord = await InterviewQuestion.findById(questionId);
     if (!questionRecord) {
       return res.status(404).json({ success: false, message: 'Question not found' });
+    }
+
+    if (questionRecord.session.toString() !== session._id.toString()) {
+      return res.status(400).json({ success: false, message: 'Question does not belong to this interview' });
     }
 
     const cleanAnswer = (answerText || '').trim();
@@ -294,6 +302,10 @@ const finishInterview = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Interview session not found' });
     }
 
+    if (session.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'User not authorized to modify this interview' });
+    }
+
     const questionsCount = session.questions.length;
     const answersCount = session.answers.length;
 
@@ -366,12 +378,29 @@ const submitInterview = async (req, res) => {
   try {
     const { interviewId, answers, duration } = req.body;
 
+    if (!interviewId || !Array.isArray(answers) || answers.length === 0) {
+      return res.status(400).json({ success: false, message: 'Please submit an interview ID and answers' });
+    }
+
     const session = await Interview.findById(interviewId);
     if (!session) {
       return res.status(404).json({ success: false, message: 'Interview session not found' });
     }
 
+    if (session.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'User not authorized to modify this interview' });
+    }
+
     for (const ans of answers) {
+      if (!ans.questionId) {
+        return res.status(400).json({ success: false, message: 'Each answer must include a question ID' });
+      }
+
+      const questionRecord = await InterviewQuestion.findById(ans.questionId);
+      if (!questionRecord || questionRecord.session.toString() !== session._id.toString()) {
+        return res.status(400).json({ success: false, message: 'Invalid question submitted for this interview' });
+      }
+
       const cleanAns = (ans.answerText || '').trim();
       const isSkipped = cleanAns === 'Skipped' || cleanAns === '';
       const answerRecord = await InterviewAnswer.create({
@@ -380,7 +409,6 @@ const submitInterview = async (req, res) => {
         answerText: isSkipped ? 'Skipped' : cleanAns,
       });
 
-      const questionRecord = await InterviewQuestion.findById(ans.questionId);
       let evaluation;
 
       const wordsList = cleanAns.split(/\s+/).filter(w => w.length > 0);
